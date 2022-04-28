@@ -1,0 +1,20 @@
+display_information:
+  name: Coffee Bot
+  description: I organize small coffee breaks.
+  long_description: Every Monday I organize small coffee breaks for half of users in the given user list. In these coffee breaks you can talk about everything you like. Enjoy your coffee breaks ☕!
+  background_color: "#241e24"
+features:
+  bot_user:
+    display_name: Coffee Bot
+    always_online: false
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - im:write
+      - mpim:write
+      - users:read
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
