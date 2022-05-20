@@ -28,6 +28,7 @@ You can find the token in the `OAuth & Permissions` section of your app.
 You also need to configure the user list in the SecretsManager. 
 Create a secret named `coffee-break-slack-bot/users` to store the user list.
 You can find the id of a slack member in the profile information. Press `More` and copy the member id.
+The format of the list has to be `["U1", "U2", ...]`.
 
 ## Testing
 Install requirements before running test
