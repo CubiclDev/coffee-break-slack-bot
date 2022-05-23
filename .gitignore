@@ -1,0 +1,10 @@
+.idea
+
+venv
+tests/.pytest_cache
+
+**/__pycache__
+**/.terraform/
+
+/slack_bot.zip
+slack_bot_with_dependencies

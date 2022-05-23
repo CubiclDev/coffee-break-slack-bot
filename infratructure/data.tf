@@ -1,6 +1,6 @@
 data "archive_file" "this" {
   output_path = "${path.module}/../slack_bot.zip"
-  source_dir = "${path.module}/../slack_bot"
+  source_dir = "${path.module}/../slack_bot_with_dependencies"
   type        = "zip"
 }
 

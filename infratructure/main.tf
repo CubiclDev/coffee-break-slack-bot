@@ -27,7 +27,7 @@ resource "aws_s3_object" "lambda_slack_bot" {
   key    = "slack_bot.zip"
   source = "../slack_bot.zip"
 
-  etag = filemd5("../slack_bot.zip")
+  etag = data.archive_file.this.output_md5
 }
 
 resource "aws_lambda_function" "slack_bot" {
@@ -40,7 +40,7 @@ resource "aws_lambda_function" "slack_bot" {
   handler = "app.handler"
   timeout = 60 # in seconds
 
-  source_code_hash = filebase64sha256("../slack_bot.zip")
+  source_code_hash = data.archive_file.this.output_base64sha256
 
   role = aws_iam_role.lambda_exec.arn
 
