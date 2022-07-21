@@ -68,5 +68,5 @@ def get_chosen_users(all_users: list[str]) -> list:
 
 def get_user_name(user_id: str, client: WebClient) -> str:
     user_info = client.users_info(user=user_id)
-    user_name = user_info["user"]["name"]
-    return user_name.capitalize()
+    user_name = user_info["user"]["profile"]["real_name"]
+    return user_name.split()[0]
