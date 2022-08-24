@@ -8,6 +8,7 @@ import random
 from slack_sdk import WebClient
 import datetime
 import holidays
+from typing import List
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -28,7 +29,7 @@ def handler(__event, __context) -> None:
         remove_chosen_users(chosen_users, all_users)
 
 
-def send_message(users: list[str], client: WebClient) -> None:
+def send_message(users: List[str], client: WebClient) -> None:
     response = client.conversations_open(users=users)
     user_name_1 = get_user_name(users[0], client)
     user_name_2 = get_user_name(users[1], client)
@@ -42,7 +43,7 @@ def send_message(users: list[str], client: WebClient) -> None:
     )
 
 
-def remove_chosen_users(chosen_users: list[str], all_users: list[str]):
+def remove_chosen_users(chosen_users: List[str], all_users: List[str]):
     all_users.remove(chosen_users[0])
     all_users.remove(chosen_users[1])
 
@@ -62,7 +63,7 @@ def get_all_users() -> list:
     return json.loads(os.environ.get("USERS"))
 
 
-def get_chosen_users(all_users: list[str]) -> list:
+def get_chosen_users(all_users: List[str]) -> list:
     return random.sample(all_users, k=2)
 
 
