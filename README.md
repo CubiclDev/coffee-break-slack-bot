@@ -30,8 +30,14 @@ Create a secret named `coffee-break-slack-bot/users` to store the user list.
 You can find the id of a slack member in the profile information. Press `More` and copy the member id.
 The format of the list has to be `["U1", "U2", ...]`.
 
+### Terraform Variables
+If you like to use other values then the default values of the variables.
+then copy the `tfvars` file to `terraform.tfvars` and fill the variables.
+Variables:
+- `language`: ISO 639-1 language code for the language of the message. Supported are 'en' and 'de'. The default language is english.
+
 ## Testing
-Install requirements before running test
+Install requirements before running tests
 ```shell
 pip install -r requirements-dev.txt
 ```

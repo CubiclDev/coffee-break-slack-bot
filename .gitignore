@@ -8,3 +8,5 @@ tests/.pytest_cache
 
 /slack_bot.zip
 slack_bot_with_dependencies
+
+infrastructure/terraform.tfvars
