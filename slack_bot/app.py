@@ -37,10 +37,22 @@ def send_message(users: List[str], client: WebClient) -> None:
 
     client.chat_postMessage(
         channel=response['channel']['id'],
-        text=f'{user_name_1} and {user_name_2}, you were selected for a shared coffee break.\n'
-             'Please schedule a meeting of 15-20 minutes this week.\n\n'
-             'Your coffee bot ☕'
+        text=get_message(user_name_1, user_name_2)
     )
+
+
+def get_message(user_name_1: str, user_name_2: str) -> str:
+    language = os.environ.get("LANGUAGE", "en")
+
+    if language == "de":
+        return f'{user_name_1} und {user_name_2}, ihr wurdet für einen gemeinsamen Kaffeeklatsch ausgelost.\n' \
+               'Bitte sucht euch für diese Woche einen Zeitslot von 15-20 Minuten.\n\n' \
+               'Euer Kaffeebot ☕'
+
+    # return english as default
+    return f'{user_name_1} and {user_name_2}, you were selected for a shared coffee break.\n' \
+           'Please schedule a meeting of 15-20 minutes this week.\n\n' \
+           'Your coffee bot ☕'
 
 
 def remove_chosen_users(chosen_users: List[str], all_users: List[str]):
