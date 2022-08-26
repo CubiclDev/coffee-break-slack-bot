@@ -31,10 +31,10 @@ You can find the id of a slack member in the profile information. Press `More` a
 The format of the list has to be `["U1", "U2", ...]`.
 
 ### Terraform Variables
-If you like to use other values then the default values of the variables.
-then copy the `tfvars` file to `terraform.tfvars` and fill the variables.
-Variables:
-- `language`: ISO 639-1 language code for the language of the message. Supported are 'en' and 'de'. The default language is english.
+If you would like to override default values of variables, copy the `terraform.tfvars.dist` file to `terraform.tfvars` and fill in values for the predefined variable names.
+	
+List of all variables:
+- `language`: ISO 639-1 language code for the language of the message. Supported are 'en' and 'de'. The default language is english. Unsupported languages fall back to english as well.
 
 ## Testing
 Install requirements before running tests
