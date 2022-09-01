@@ -46,6 +46,7 @@ resource "aws_lambda_function" "slack_bot" {
 
   environment {
     variables = {
+      LANGUAGE = var.language
       SLACK_TOKEN = data.aws_secretsmanager_secret_version.slack_token.secret_string
       USERS = data.aws_secretsmanager_secret_version.users.secret_string
     }

@@ -1,10 +1,12 @@
 import copy
+import os
 
+import pytest
 from slack_sdk import WebClient
 from freezegun import freeze_time
 
 from slack_bot import __version__
-from slack_bot.app import get_chosen_users, handler, is_today_holiday, send_message, remove_chosen_users
+from slack_bot.app import get_chosen_users, handler, is_today_holiday, send_message, remove_chosen_users, get_message
 
 TEST_USERS = [
     'U1',
@@ -77,9 +79,46 @@ def test_send_message(mocker):
     assert mock_get_user_name.call_args_list[0].args[0] == 'U1'
     assert mock_get_user_name.call_args_list[1].args[0] == 'U2'
     assert mock_chat_postMessage.call_args_list[0][1]['text'] == \
-           'Name1 and Name2, you were selected for a shared coffee break this week.\n' \
-           'Please search for a slot of 15-20 minutes this week.\n\n' \
+           'Name1 and Name2, you were selected for a shared coffee break.\n' \
+           'Please schedule a meeting of 15-20 minutes this week.\n\n' \
            'Your coffee bot ☕'
+
+
+@pytest.mark.parametrize(
+    "language,expected_message",
+    [(
+            None,
+            'Name1 and Name2, you were selected for a shared coffee break.\n'
+            'Please schedule a meeting of 15-20 minutes this week.\n\n'
+            'Your coffee bot ☕'
+    ), (
+            'en',
+            'Name1 and Name2, you were selected for a shared coffee break.\n'
+            'Please schedule a meeting of 15-20 minutes this week.\n\n'
+            'Your coffee bot ☕'
+    ), (
+            'not_defined_language',
+            'Name1 and Name2, you were selected for a shared coffee break.\n'
+            'Please schedule a meeting of 15-20 minutes this week.\n\n'
+            'Your coffee bot ☕'
+    ), (
+            'de',
+            'Name1 und Name2, ihr wurdet für einen gemeinsamen Kaffeeklatsch ausgelost.\n'
+            'Bitte sucht euch für diese Woche einen Zeitslot von 15-20 Minuten.\n\n'
+            'Euer Kaffeebot ☕'
+    )
+    ]
+)
+def test_get_message(mocker, language: str, expected_message: str):
+    # given
+    if language:
+        mocker.patch.dict(os.environ, {"LANGUAGE": language}, clear=True)
+
+    # when
+    message = get_message('Name1', 'Name2')
+
+    # then
+    assert message == expected_message
 
 
 def test_remove_users():
