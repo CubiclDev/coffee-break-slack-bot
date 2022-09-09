@@ -19,13 +19,13 @@ def handler(__event, __context) -> None:
 
     client = WebClient(token=get_token())
 
-    all_users = get_all_users()
-    number_of_coffee_breaks = math.ceil(len(all_users) / 4)  # half of the users should have a coffee break
+    users = get_users(client)
+    number_of_coffee_breaks = math.ceil(len(users) / 4)  # half of the users should have a coffee break
 
     for _ in range(number_of_coffee_breaks):
-        chosen_users = get_chosen_users(all_users)
+        chosen_users = get_chosen_users(users)
         send_message(chosen_users, client)
-        remove_chosen_users(chosen_users, all_users)
+        remove_chosen_users(chosen_users, users)
 
 
 def send_message(users: list[str], client: WebClient) -> None:
@@ -70,8 +70,30 @@ def get_token() -> str:
     return os.environ["SLACK_TOKEN"]
 
 
-def get_all_users() -> list:
-    return json.loads(os.environ.get("USERS"))
+def get_users(client: WebClient) -> list:
+    users = json.loads(os.environ.get("USERS"))
+    return get_filtered_users(users, client)
+
+
+def get_filtered_users(users: list[str], client: WebClient) -> list[str]:
+    filtered_users = filter(lambda user: is_included_user(user, client), users)
+    return list(filtered_users)
+
+
+def is_included_user(user: str, client: WebClient) -> bool:
+    user_info = client.users_info(user=user)["user"]
+    absence_emojis = [":palm_tree:", ":face_with_thermometer:"]
+    if user_info["deleted"] is True:
+        return False
+    if user_info["profile"]["status_emoji"] not in absence_emojis:
+        return True
+
+    status_expiration = user_info["profile"]["status_expiration"]
+    tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
+    if status_expiration != 0 and status_expiration < tomorrow.timestamp():
+        return True
+
+    return False
 
 
 def get_chosen_users(all_users: list[str]) -> list:

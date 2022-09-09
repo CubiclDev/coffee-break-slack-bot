@@ -2,11 +2,12 @@ import copy
 import os
 
 import pytest
-from slack_sdk import WebClient
 from freezegun import freeze_time
+from slack_sdk import WebClient
 
 from slack_bot import __version__
-from slack_bot.app import get_chosen_users, handler, is_today_holiday, send_message, remove_chosen_users, get_message
+from slack_bot.app import get_chosen_users, handler, is_today_holiday, send_message, remove_chosen_users, get_message, \
+    is_included_user
 
 TEST_USERS = [
     'U1',
@@ -47,7 +48,7 @@ def test_check_holiday_no_holiday():
 @freeze_time('2021-01-02')
 def test_handler(mocker):
     # given
-    mock_get_all_users = mocker.patch('slack_bot.app.get_all_users', return_value=copy.deepcopy(TEST_USERS))
+    mock_get_all_users = mocker.patch('slack_bot.app.get_users', return_value=copy.deepcopy(TEST_USERS))
     mock_token = mocker.patch('slack_bot.app.get_token', return_value='xxx')
     mock_send_message = mocker.patch('slack_bot.app.send_message')
 
@@ -119,6 +120,51 @@ def test_get_message(mocker, language: str, expected_message: str):
 
     # then
     assert message == expected_message
+
+
+@pytest.mark.parametrize(
+    "user,user_info,expected_value",
+    [(
+            'DELETED_USER_ID',
+            {'user': {'deleted': True, 'profile': {'status_emoji': '', 'status_expiration': 0}}},
+            False
+    ), (
+            'HOLIDAY_USER_ID',
+            {'user': {'deleted': False, 'profile': {'status_emoji': ':palm_tree:', 'status_expiration': 0}}},
+            False
+    ), (
+            'HOLIDAY_EXPIRES_EARLY_USER_ID',
+            {'user': {'deleted': False, 'profile': {'status_emoji': ':palm_tree:', 'status_expiration': 1662793200}}},
+            True
+    ), (
+            'HOLIDAY_EXPIRES_LATE_USER_ID',
+            {'user': {'deleted': False, 'profile': {'status_emoji': ':palm_tree:', 'status_expiration': 1662879600}}},
+            False
+    ), (
+            'ILL_USER_ID',
+            {'user': {'deleted': False, 'profile': {'status_emoji': ':face_with_thermometer:', 'status_expiration': 0}}},
+            False
+    ), (
+            'STANDARD_USER_ID',
+            {'user': {'deleted': False, 'profile': {'status_emoji': '', 'status_expiration': 0}}},
+            True
+    ), (
+            'STANDARD_USER_ID_WITH_EMOJI',
+            {'user': {'deleted': False, 'profile': {'status_emoji': ':no_entry:', 'status_expiration': 0}}},
+            True
+    )
+    ]
+)
+@freeze_time('2022-09-09 10:00:00')
+def test_is_included_user(mocker, user: str, user_info: dict, expected_value: bool):
+    # given
+    mocker.patch('slack_sdk.WebClient.users_info', return_value=user_info)
+
+    # when
+    is_included = is_included_user(user, client=WebClient())
+
+    # then
+    assert is_included is expected_value
 
 
 def test_remove_users():
