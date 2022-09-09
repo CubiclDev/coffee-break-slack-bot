@@ -86,7 +86,7 @@ def test_send_message(mocker):
 
 
 @pytest.mark.parametrize(
-    "language,expected_message",
+    'language,expected_message',
     [(
             None,
             'Name1 and Name2, you were selected for a shared coffee break.\n'
@@ -113,7 +113,7 @@ def test_send_message(mocker):
 def test_get_message(mocker, language: str, expected_message: str):
     # given
     if language:
-        mocker.patch.dict(os.environ, {"LANGUAGE": language}, clear=True)
+        mocker.patch.dict(os.environ, {'LANGUAGE': language}, clear=True)
 
     # when
     message = get_message('Name1', 'Name2')
@@ -123,7 +123,7 @@ def test_get_message(mocker, language: str, expected_message: str):
 
 
 @pytest.mark.parametrize(
-    "user,user_info,expected_value",
+    'user,user_info,expected_value',
     [(
             'DELETED_USER_ID',
             {'user': {'deleted': True, 'profile': {'status_emoji': '', 'status_expiration': 0}}},

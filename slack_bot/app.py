@@ -41,9 +41,9 @@ def send_message(users: list[str], client: WebClient) -> None:
 
 
 def get_message(user_name_1: str, user_name_2: str) -> str:
-    language = os.environ.get("LANGUAGE", "en")
+    language = os.environ.get('LANGUAGE', 'en')
 
-    if language == "de":
+    if language == 'de':
         return f'{user_name_1} und {user_name_2}, ihr wurdet für einen gemeinsamen Kaffeeklatsch ausgelost.\n' \
                'Bitte sucht euch für diese Woche einen Zeitslot von 15-20 Minuten.\n\n' \
                'Euer Kaffeebot ☕'
@@ -67,11 +67,11 @@ def is_today_holiday() -> bool:
 
 
 def get_token() -> str:
-    return os.environ["SLACK_TOKEN"]
+    return os.environ['SLACK_TOKEN']
 
 
 def get_users(client: WebClient) -> list:
-    users = json.loads(os.environ.get("USERS"))
+    users = json.loads(os.environ.get('USERS'))
     return get_filtered_users(users, client)
 
 
@@ -81,14 +81,14 @@ def get_filtered_users(users: list[str], client: WebClient) -> list[str]:
 
 
 def is_included_user(user: str, client: WebClient) -> bool:
-    user_info = client.users_info(user=user)["user"]
-    absence_emojis = [":palm_tree:", ":face_with_thermometer:"]
-    if user_info["deleted"] is True:
+    user_info = client.users_info(user=user)['user']
+    absence_emojis = [':palm_tree:', ':face_with_thermometer:']
+    if user_info['deleted'] is True:
         return False
-    if user_info["profile"]["status_emoji"] not in absence_emojis:
+    if user_info['profile']['status_emoji'] not in absence_emojis:
         return True
 
-    status_expiration = user_info["profile"]["status_expiration"]
+    status_expiration = user_info['profile']['status_expiration']
     tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
     if status_expiration != 0 and status_expiration < tomorrow.timestamp():
         return True
@@ -102,5 +102,5 @@ def get_chosen_users(all_users: list[str]) -> list:
 
 def get_user_name(user_id: str, client: WebClient) -> str:
     user_info = client.users_info(user=user_id)
-    user_name = user_info["user"]["profile"]["real_name"]
+    user_name = user_info['user']['profile']['real_name']
     return user_name.split()[0]
