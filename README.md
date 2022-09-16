@@ -3,12 +3,7 @@
 This bot invites randomly picked pairs to a coffee break in Slack each week.
 As a result, the exchange in the team is increased.
 
-Users that are absence are automatically excluded.
-That means, that users which were deleted are ignored for the coffee break.
-Also, users that are absence because they are on holiday or ill will be excluded.
-Therefore, the slack status is evaluated. If a user has one of the following emojis in his status he will be excluded.
-
-Status that are excluded:
+Users that are absent are automatically excluded. Absence is determined by checking if one of the following status emojis is set:
 - 🌴
 - 🤒
 
