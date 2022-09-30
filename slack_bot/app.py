@@ -13,9 +13,7 @@ ABSENCE_EMOJIS = [":palm_tree:", ":face_with_thermometer:"]
 
 
 def handler(__event, __context) -> None:
-
     client = WebClient(token=get_token())
-
     users = get_users(client)
     # half of the users should have a coffee break
     number_of_coffee_breaks = math.ceil(len(users) / 4)
