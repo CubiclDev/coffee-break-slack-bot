@@ -9,7 +9,6 @@ from slack_bot.app import (
     get_message,
     handler,
     is_included_user,
-    is_today_holiday,
     remove_chosen_users,
     send_message,
 )
@@ -39,16 +38,6 @@ def test_get_users():
     # then
     assert len(user_ids) == 2
     assert user_ids[0] != user_ids[1]
-
-
-@freeze_time("2021-01-01")
-def test_check_holiday_new_year():
-    assert is_today_holiday()
-
-
-@freeze_time("2021-01-02")
-def test_check_holiday_no_holiday():
-    assert not is_today_holiday()
 
 
 @freeze_time("2021-01-02")
