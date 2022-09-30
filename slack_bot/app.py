@@ -5,7 +5,6 @@ import math
 import os
 import random
 
-import holidays
 from slack_sdk import WebClient
 
 logger = logging.getLogger()
@@ -14,8 +13,6 @@ ABSENCE_EMOJIS = [":palm_tree:", ":face_with_thermometer:"]
 
 
 def handler(__event, __context) -> None:
-    if is_today_holiday():
-        return
 
     client = WebClient(token=get_token())
 
@@ -58,13 +55,6 @@ def get_message(user_name_1: str, user_name_2: str) -> str:
 def remove_chosen_users(chosen_users: list[str], all_users: list[str]):
     all_users.remove(chosen_users[0])
     all_users.remove(chosen_users[1])
-
-
-def is_today_holiday() -> bool:
-    now = datetime.datetime.now()
-    de_holidays = holidays.DE()
-    holiday = de_holidays.get(now)
-    return holiday is not None
 
 
 def get_token() -> str:
