@@ -36,7 +36,7 @@ class S3FileHandler(FileHandler):
             with open('/tmp/runs.jsonl', 'r') as f:
                 return [json.loads(line) for line in f]
         except Exception as e:
-            logger.error(f"Error downloading file from S3: {e}")
+            logger.warning(f"Error downloading file from S3: {e}")
             return []
 
     def write(self, data: List[dict]) -> None:
@@ -46,7 +46,7 @@ class S3FileHandler(FileHandler):
                     f.write(json.dumps(entry) + '\n')
             self.s3.upload_file('/tmp/runs.jsonl', self.bucket, self.key)
         except Exception as e:
-            logger.error(f"Error uploading file to S3: {e}")
+            logger.warning(f"Error uploading file to S3: {e}")
 
 
 class LocalFileHandler(FileHandler):
@@ -58,7 +58,7 @@ class LocalFileHandler(FileHandler):
             with open(self.key, 'r') as f:
                 return [json.loads(line) for line in f]
         except Exception as e:
-            logger.error(f"Error reading file from local filesystem: {e}")
+            logger.warning(f"Error reading file from local filesystem: {e}")
             return []
 
     def write(self, data: List[dict]) -> None:
@@ -67,7 +67,7 @@ class LocalFileHandler(FileHandler):
                 for entry in data:
                     f.write(json.dumps(entry) + '\n')
         except Exception as e:
-            logger.error(f"Error writing file to local filesystem: {e}")
+            logger.warning(f"Error writing file to local filesystem: {e}")
 
 
 def handler(__event, __context) -> None:
