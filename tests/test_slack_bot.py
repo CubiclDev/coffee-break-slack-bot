@@ -25,6 +25,13 @@ TEST_USERS = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def remove_runs_file():
+    yield
+    if os.path.exists("runs.jsonl"):
+        os.remove("runs.jsonl")
+
+
 def test_version():
     assert __version__ == "0.1.0"
 
