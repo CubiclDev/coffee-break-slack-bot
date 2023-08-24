@@ -4,6 +4,8 @@ import logging
 import math
 import os
 import random
+import boto3
+from typing import List, Tuple
 
 from slack_sdk import WebClient
 
@@ -16,17 +18,38 @@ def handler(__event, __context) -> None:
     client = WebClient(token=get_token())
     users = get_users(client)
 
+    # Load previous runs from S3
+    s3 = boto3.client('s3', aws_access_key_id=os.environ['AWS_ACCESS_KEY'], aws_secret_access_key=os.environ['AWS_SECRET_KEY'])
+    bucket = os.environ['S3_BUCKET']
+    key = os.environ['S3_KEY']
 
-    # shuffle the users array
-    random.shuffle(users)
+    try:
+        s3.download_file(bucket, key, '/tmp/runs.jsonl')
+    except Exception as e:
+        logger.error(f"Error downloading file from S3: {e}")
+        return
 
-    # take half of the users (if it's odd, make it even, by using ceil)
-    half_users = users[:math.ceil(len(users) / 2)]
+    with open('/tmp/runs.jsonl', 'r') as f:
+        previous_runs = [json.loads(line) for line in f]
+
+    # Filter users based on previous runs
+    users = filter_users_based_on_previous_runs(users, previous_runs)
 
     # create pairs from entries
-    user_pairs = list(zip(half_users[::2], half_users[1::2]))
+    user_pairs = list(zip(users[::2], users[1::2]))
     for user_pair in user_pairs:
         send_message(user_pair, client)
+
+    # Update runs file
+    with open('/tmp/runs.jsonl', 'a') as f:
+        for pair in user_pairs:
+            f.write(json.dumps({"date": datetime.datetime.now().isoformat(), "pair": pair}) + '\n')
+
+    # Upload runs file to S3
+    try:
+        s3.upload_file('/tmp/runs.jsonl', bucket, key)
+    except Exception as e:
+        logger.error(f"Error uploading file to S3: {e}")
 
 def send_message(users: list[str], client: WebClient) -> None:
     response = client.conversations_open(users=users)
@@ -85,3 +108,31 @@ def get_user_name(user_id: str, client: WebClient) -> str:
     user_info = client.users_info(user=user_id)
     user_name = user_info["user"]["profile"]["real_name"]
     return user_name.split()[0]
+
+def filter_users_based_on_previous_runs(users, previous_runs):
+    thirty_days_ago = datetime.datetime.now() - datetime.timedelta(days=30)
+
+    # Find the last run date of each user
+    last_run_dates = {}
+    for run in previous_runs:
+        for user in run['pair']:
+            if user not in last_run_dates or datetime.datetime.fromisoformat(run['date']) > datetime.datetime.fromisoformat(last_run_dates[user]):
+                last_run_dates[user] = run['date']
+
+    # Users who need a break due to the 30-day rule
+    need_break_users = {user for user in users if user not in last_run_dates or datetime.datetime.fromisoformat(last_run_dates[user]) < thirty_days_ago}
+
+    # Users from the latest run date (those who took a break in the last round)
+    latest_run_date = max(run['date'] for run in previous_runs)
+    last_round_users = {user for run in previous_runs if run['date'] == latest_run_date for user in run['pair']}
+
+    # Combine both sets
+    combined_users = need_break_users.union(last_round_users)
+
+    # If we haven't met the 50% rule, add random users
+    available_users = set(users) - combined_users
+    required_users_count = len(users) // 2 - len(combined_users)
+    if required_users_count > 0:
+        combined_users.update(random.sample(available_users, required_users_count))
+
+    return list(combined_users)
