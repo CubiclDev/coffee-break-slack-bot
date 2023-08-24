@@ -15,14 +15,18 @@ ABSENCE_EMOJIS = [":palm_tree:", ":face_with_thermometer:"]
 def handler(__event, __context) -> None:
     client = WebClient(token=get_token())
     users = get_users(client)
-    # half of the users should have a coffee break
-    number_of_coffee_breaks = math.ceil(len(users) / 4)
 
-    for _ in range(number_of_coffee_breaks):
-        chosen_users = get_chosen_users(users)
-        send_message(chosen_users, client)
-        remove_chosen_users(chosen_users, users)
 
+    # shuffle the users array
+    random.shuffle(users)
+
+    # take half of the users (if it's odd, make it even, by using ceil)
+    half_users = users[:math.ceil(len(users) / 2)]
+
+    # create pairs from entries
+    user_pairs = list(zip(half_users[::2], half_users[1::2]))
+    for user_pair in user_pairs:
+        send_message(user_pair, client)
 
 def send_message(users: list[str], client: WebClient) -> None:
     response = client.conversations_open(users=users)
@@ -48,12 +52,6 @@ def get_message(user_name_1: str, user_name_2: str) -> str:
     return f"{user_name_1} and {user_name_2}, you were selected for a shared coffee break.\n" \
            "Please schedule a meeting of 15-20 minutes this week.\n\n" \
            "Your coffee bot ☕"
-
-
-def remove_chosen_users(chosen_users: list[str], all_users: list[str]):
-    all_users.remove(chosen_users[0])
-    all_users.remove(chosen_users[1])
-
 
 def get_token() -> str:
     return os.environ["SLACK_TOKEN"]
@@ -82,11 +80,6 @@ def is_included_user(user: str, client: WebClient) -> bool:
         return True
 
     return False
-
-
-def get_chosen_users(all_users: list[str]) -> list:
-    return random.sample(all_users, k=2)
-
 
 def get_user_name(user_id: str, client: WebClient) -> str:
     user_info = client.users_info(user=user_id)
