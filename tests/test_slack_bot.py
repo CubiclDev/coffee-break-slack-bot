@@ -6,7 +6,7 @@ from freezegun import freeze_time
 from slack_bot import __version__
 from slack_bot.app import (
     get_message,
-    handler,
+    local_dev_handler,
     is_included_user,
     send_message,
 )
@@ -39,7 +39,7 @@ def test_handler(mocker):
     mock_send_message = mocker.patch("slack_bot.app.send_message")
 
     # when
-    handler("", "")
+    local_dev_handler("", "")
 
     # then
     mock_get_all_users.assert_called_once()

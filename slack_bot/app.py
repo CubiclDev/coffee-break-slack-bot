@@ -171,7 +171,7 @@ def filter_users_based_on_previous_runs(users, previous_runs):
     need_break_users = {user for user in users if user not in last_run_dates or datetime.datetime.fromisoformat(last_run_dates[user]) < thirty_days_ago}
 
     # Users from the latest run date (those who took a break in the last round)
-    latest_run_date = max(run['date'] for run in previous_runs)
+    latest_run_date = max(run['date'] for run in previous_runs) if previous_runs else "1970-01-01"
     last_round_users = {user for run in previous_runs if run['date'] == latest_run_date for user in run['pair']}
 
     # If we haven't met the 50% rule, add random users to fill incomplete user pairs
