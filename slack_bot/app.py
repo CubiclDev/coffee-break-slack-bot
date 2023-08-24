@@ -91,7 +91,11 @@ def process_users(file_handler: FileHandler) -> None:
     users = filter_users_based_on_previous_runs(users, previous_runs)
 
     # create pairs from entries
+    logger.info("Picking from user list: %s", users)
+
     user_pairs = list(zip(users[::2], users[1::2]))
+    logger.info("Picked pairs: %s", user_pairs)
+
     for user_pair in user_pairs:
         send_message(user_pair, client)
 
