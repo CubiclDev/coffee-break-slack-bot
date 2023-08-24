@@ -126,13 +126,10 @@ def filter_users_based_on_previous_runs(users, previous_runs):
     latest_run_date = max(run['date'] for run in previous_runs)
     last_round_users = {user for run in previous_runs if run['date'] == latest_run_date for user in run['pair']}
 
-    # Combine both sets
-    combined_users = need_break_users.union(last_round_users)
-
-    # If we haven't met the 50% rule, add random users
-    available_users = set(users) - combined_users
-    required_users_count = len(users) // 2 - len(combined_users)
+    # If we haven't met the 50% rule, add random users to fill incomplete user pairs
+    available_users = set(users) - need_break_users - last_round_users
+    required_users_count = len(users) // 2 - len(need_break_users)
     if required_users_count > 0:
-        combined_users.update(random.sample(available_users, required_users_count))
+        need_break_users.update(random.sample(available_users, required_users_count))
 
-    return list(combined_users)
+    return list(need_break_users)
