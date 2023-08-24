@@ -5,11 +5,9 @@ import pytest
 from freezegun import freeze_time
 from slack_bot import __version__
 from slack_bot.app import (
-    get_chosen_users,
     get_message,
     handler,
     is_included_user,
-    remove_chosen_users,
     send_message,
 )
 from slack_sdk import WebClient
@@ -29,15 +27,6 @@ TEST_USERS = [
 
 def test_version():
     assert __version__ == "0.1.0"
-
-
-def test_get_users():
-    # when
-    user_ids = get_chosen_users(TEST_USERS)
-
-    # then
-    assert len(user_ids) == 2
-    assert user_ids[0] != user_ids[1]
 
 
 @freeze_time("2021-01-02")
@@ -221,24 +210,3 @@ def test_is_included_user(mocker, user: str, user_info: dict, expected_value: bo
 
     # then
     assert is_included is expected_value
-
-
-def test_remove_users():
-    # given
-    user_list = copy.deepcopy(TEST_USERS)
-    users_length = len(user_list)
-
-    # when
-    remove_chosen_users(["U1", "U2"], user_list)
-
-    # then
-    assert len(user_list) == users_length - 2
-    assert user_list == [
-        "U3",
-        "U4",
-        "U5",
-        "U6",
-        "U7",
-        "U8",
-        "U9",
-    ]
