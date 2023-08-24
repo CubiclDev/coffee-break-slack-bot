@@ -162,6 +162,9 @@ def get_user_name(user_id: str, client: WebClient) -> str:
     return user_name.split()[0]
 
 def filter_users_based_on_previous_runs(users, previous_runs):
+    if len(users) < 2:
+        return []
+
     thirty_days_ago = datetime.datetime.now() - datetime.timedelta(days=30)
 
     # Find the last run date of each user
@@ -181,7 +184,13 @@ def filter_users_based_on_previous_runs(users, previous_runs):
     # If we haven't met the 50% rule, add random users to fill incomplete user pairs
     available_users = list(set(users) - need_break_users - last_round_users)
     required_users_count = len(users) // 2 - len(need_break_users)
-    if required_users_count > 0:
-        need_break_users.update(random.sample(available_users, required_users_count))
+
+    if required_users_count <= 0:
+        return list(need_break_users)
+    
+    if len(available_users) < 1:
+        return list(need_break_users) + random.sample(users, 1)
+    
+    need_break_users.update(random.sample(available_users, required_users_count) if len(available_users) > required_users_count else available_users)
 
     return list(need_break_users)

@@ -51,7 +51,18 @@ def test_handler(mocker):
     # then
     mock_get_all_users.assert_called_once()
     mock_token.assert_called_once()
-    assert mock_send_message.call_count == 3
+    assert mock_send_message.call_count == 4
+
+    # when we try again only one more person should get a paired break
+    with freeze_time("2021-01-03"):
+        local_dev_handler("", "")
+        assert mock_send_message.call_count == 5
+
+    # when we try again
+    with freeze_time("2021-01-04"):
+        local_dev_handler("", "")
+        # then the count should stay the same
+        assert mock_send_message.call_count == 7
 
 
 def test_send_message(mocker):
