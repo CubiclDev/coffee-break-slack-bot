@@ -6,6 +6,7 @@ import os
 import random
 import boto3
 from typing import List, Tuple
+from abc import ABC, abstractmethod
 
 from slack_sdk import WebClient
 
@@ -13,24 +14,78 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 ABSENCE_EMOJIS = [":palm_tree:", ":face_with_thermometer:"]
 
+class FileHandler(ABC):
+    @abstractmethod
+    def read(self) -> List[dict]:
+        pass
+
+    @abstractmethod
+    def write(self, data: List[dict]) -> None:
+        pass
+
+
+class S3FileHandler(FileHandler):
+    def __init__(self, bucket: str, key: str):
+        self.s3 = boto3.client('s3', aws_access_key_id=os.environ['AWS_ACCESS_KEY'], aws_secret_access_key=os.environ['AWS_SECRET_KEY'])
+        self.bucket = bucket
+        self.key = key
+
+    def read(self) -> List[dict]:
+        try:
+            self.s3.download_file(self.bucket, self.key, '/tmp/runs.jsonl')
+            with open('/tmp/runs.jsonl', 'r') as f:
+                return [json.loads(line) for line in f]
+        except Exception as e:
+            logger.error(f"Error downloading file from S3: {e}")
+            return []
+
+    def write(self, data: List[dict]) -> None:
+        try:
+            with open('/tmp/runs.jsonl', 'a') as f:
+                for entry in data:
+                    f.write(json.dumps(entry) + '\n')
+            self.s3.upload_file('/tmp/runs.jsonl', self.bucket, self.key)
+        except Exception as e:
+            logger.error(f"Error uploading file to S3: {e}")
+
+
+class LocalFileHandler(FileHandler):
+    def __init__(self, key: str):
+        self.key = key
+
+    def read(self) -> List[dict]:
+        try:
+            with open(self.key, 'r') as f:
+                return [json.loads(line) for line in f]
+        except Exception as e:
+            logger.error(f"Error reading file from local filesystem: {e}")
+            return []
+
+    def write(self, data: List[dict]) -> None:
+        try:
+            with open(self.key, 'a') as f:
+                for entry in data:
+                    f.write(json.dumps(entry) + '\n')
+        except Exception as e:
+            logger.error(f"Error writing file to local filesystem: {e}")
+
 
 def handler(__event, __context) -> None:
+    file_handler = S3FileHandler(os.environ['S3_BUCKET'], os.environ['S3_KEY'])
+    process_users(file_handler)
+
+
+def local_dev_handler(__event, __context) -> None:
+    file_handler = LocalFileHandler('runs.jsonl')
+    process_users(file_handler)
+
+
+def process_users(file_handler: FileHandler) -> None:
     client = WebClient(token=get_token())
     users = get_users(client)
 
-    # Load previous runs from S3
-    s3 = boto3.client('s3', aws_access_key_id=os.environ['AWS_ACCESS_KEY'], aws_secret_access_key=os.environ['AWS_SECRET_KEY'])
-    bucket = os.environ['S3_BUCKET']
-    key = os.environ['S3_KEY']
-
-    try:
-        s3.download_file(bucket, key, '/tmp/runs.jsonl')
-    except Exception as e:
-        logger.error(f"Error downloading file from S3: {e}")
-        return
-
-    with open('/tmp/runs.jsonl', 'r') as f:
-        previous_runs = [json.loads(line) for line in f]
+    # Load previous runs from file handler
+    previous_runs = file_handler.read()
 
     # Filter users based on previous runs
     users = filter_users_based_on_previous_runs(users, previous_runs)
@@ -41,15 +96,8 @@ def handler(__event, __context) -> None:
         send_message(user_pair, client)
 
     # Update runs file
-    with open('/tmp/runs.jsonl', 'a') as f:
-        for pair in user_pairs:
-            f.write(json.dumps({"date": datetime.datetime.now().isoformat(), "pair": pair}) + '\n')
+    file_handler.write([{"date": datetime.datetime.now().isoformat(), "pair": pair} for pair in user_pairs])
 
-    # Upload runs file to S3
-    try:
-        s3.upload_file('/tmp/runs.jsonl', bucket, key)
-    except Exception as e:
-        logger.error(f"Error uploading file to S3: {e}")
 
 def send_message(users: list[str], client: WebClient) -> None:
     response = client.conversations_open(users=users)
