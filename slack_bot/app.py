@@ -1,18 +1,20 @@
-import datetime
 import json
 import logging
-import math
 import os
 import random
-import boto3
-from typing import List, Tuple
 from abc import ABC, abstractmethod
+from datetime import (
+    datetime, timedelta
+)
+from typing import List
 
+import boto3
 from slack_sdk import WebClient
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 ABSENCE_EMOJIS = [":palm_tree:", ":face_with_thermometer:"]
+
 
 class FileHandler(ABC):
     @abstractmethod
@@ -25,58 +27,45 @@ class FileHandler(ABC):
 
 
 class S3FileHandler(FileHandler):
-    def __init__(self, bucket: str, key: str):
-        self.s3 = boto3.client('s3', aws_access_key_id=os.environ['AWS_ACCESS_KEY'], aws_secret_access_key=os.environ['AWS_SECRET_KEY'])
+    def __init__(self, bucket: str, prefix: str):
+        self.s3 = boto3.client('s3')
         self.bucket = bucket
-        self.key = key
+        self.prefix = prefix
+
+    def _get_object_key(self):
+        current_date = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        return f'{self.prefix}/{current_date}.jsonl'
 
     def read(self) -> List[dict]:
         try:
-            self.s3.download_file(self.bucket, self.key, '/tmp/runs.jsonl')
-            with open('/tmp/runs.jsonl', 'r') as f:
-                return [json.loads(line) for line in f]
+            object_list = self.s3.list_objects_v2(Bucket=self.bucket, Prefix='runs/')
+            file_keys = [obj['Key'] for obj in object_list.get('Contents', [])]
+
+            all_data = []
+            for file_key in sorted(file_keys):
+                response = self.s3.get_object(Bucket=self.bucket, Key=file_key)
+                data = response['Body'].read().decode('utf-8')
+                data_list = json.loads(data)
+                all_data.extend(data_list)
+
+            return all_data
         except Exception as e:
-            logger.warning(f"Error downloading file from S3: {e}")
+            logger.warning(f"Error reading data from S3: {e}")
             return []
 
     def write(self, data: List[dict]) -> None:
         try:
-            with open('/tmp/runs.jsonl', 'a') as f:
-                for entry in data:
-                    f.write(json.dumps(entry) + '\n')
-            self.s3.upload_file('/tmp/runs.jsonl', self.bucket, self.key)
+            self.s3.put_object(
+                Bucket=self.bucket,
+                Key=self._get_object_key(),
+                Body=json.dumps(data),
+            )
         except Exception as e:
-            logger.warning(f"Error uploading file to S3: {e}")
-
-
-class LocalFileHandler(FileHandler):
-    def __init__(self, key: str):
-        self.key = key
-
-    def read(self) -> List[dict]:
-        try:
-            with open(self.key, 'r') as f:
-                return [json.loads(line) for line in f]
-        except Exception as e:
-            logger.warning(f"Error reading file from local filesystem: {e}")
-            return []
-
-    def write(self, data: List[dict]) -> None:
-        try:
-            with open(self.key, 'a') as f:
-                for entry in data:
-                    f.write(json.dumps(entry) + '\n')
-        except Exception as e:
-            logger.warning(f"Error writing file to local filesystem: {e}")
+            logger.warning(f"Error writing data to S3: {e}")
 
 
 def handler(__event, __context) -> None:
-    file_handler = S3FileHandler(os.environ['S3_BUCKET'], os.environ['S3_KEY'])
-    process_users(file_handler)
-
-
-def local_dev_handler(__event, __context) -> None:
-    file_handler = LocalFileHandler('runs.jsonl')
+    file_handler = S3FileHandler(os.environ['S3_BUCKET'], os.environ['S3_PREFIX'])
     process_users(file_handler)
 
 
@@ -100,7 +89,7 @@ def process_users(file_handler: FileHandler) -> None:
         send_message(user_pair, client)
 
     # Update runs file
-    file_handler.write([{"date": datetime.datetime.now().isoformat(), "pair": pair} for pair in user_pairs])
+    file_handler.write([{"date": datetime.now().isoformat(), "pair": pair} for pair in user_pairs])
 
 
 def send_message(users: list[str], client: WebClient) -> None:
@@ -128,6 +117,7 @@ def get_message(user_name_1: str, user_name_2: str) -> str:
            "Please schedule a meeting of 15-20 minutes this week.\n\n" \
            "Your coffee bot ☕"
 
+
 def get_token() -> str:
     return os.environ["SLACK_TOKEN"]
 
@@ -150,32 +140,36 @@ def is_included_user(user: str, client: WebClient) -> bool:
         return True
 
     status_expiration = user_info["profile"]["status_expiration"]
-    tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
+    tomorrow = datetime.now() + timedelta(days=1)
     if status_expiration != 0 and status_expiration < tomorrow.timestamp():
         return True
 
     return False
+
 
 def get_user_name(user_id: str, client: WebClient) -> str:
     user_info = client.users_info(user=user_id)
     user_name = user_info["user"]["profile"]["real_name"]
     return user_name.split()[0]
 
+
 def filter_users_based_on_previous_runs(users, previous_runs):
     if len(users) < 2:
         return []
 
-    thirty_days_ago = datetime.datetime.now() - datetime.timedelta(days=30)
+    thirty_days_ago = datetime.now() - timedelta(days=30)
 
     # Find the last run date of each user
     last_run_dates = {}
     for run in previous_runs:
         for user in run['pair']:
-            if user not in last_run_dates or datetime.datetime.fromisoformat(run['date']) > datetime.datetime.fromisoformat(last_run_dates[user]):
+            if user not in last_run_dates or datetime.fromisoformat(
+                    run['date']) > datetime.fromisoformat(last_run_dates[user]):
                 last_run_dates[user] = run['date']
 
     # Users who need a break due to the 30-day rule
-    need_break_users = {user for user in users if user not in last_run_dates or datetime.datetime.fromisoformat(last_run_dates[user]) < thirty_days_ago}
+    need_break_users = {user for user in users if user not in last_run_dates or datetime.fromisoformat(
+        last_run_dates[user]) < thirty_days_ago}
 
     # Users from the latest run date (those who took a break in the last round)
     latest_run_date = max(run['date'] for run in previous_runs) if previous_runs else "1970-01-01"
@@ -187,10 +181,11 @@ def filter_users_based_on_previous_runs(users, previous_runs):
 
     if required_users_count <= 0:
         return list(need_break_users)
-    
+
     if len(available_users) < 1:
         return list(need_break_users) + random.sample(users, 1)
-    
-    need_break_users.update(random.sample(available_users, required_users_count) if len(available_users) > required_users_count else available_users)
+
+    need_break_users.update(random.sample(available_users, required_users_count) if len(
+        available_users) > required_users_count else available_users)
 
     return list(need_break_users)

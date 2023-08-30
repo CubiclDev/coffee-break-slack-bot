@@ -3,11 +3,14 @@ import os
 
 import pytest
 from freezegun import freeze_time
+from moto import mock_s3
+import boto3
+
 from slack_bot import __version__
 from slack_bot.app import (
     get_message,
-    local_dev_handler,
     is_included_user,
+    handler,
     send_message,
 )
 from slack_sdk import WebClient
@@ -25,20 +28,18 @@ TEST_USERS = [
 ]
 
 
-@pytest.fixture(autouse=True)
-def remove_runs_file():
-    yield
-    if os.path.exists("runs.jsonl"):
-        os.remove("runs.jsonl")
-
-
 def test_version():
     assert __version__ == "0.1.0"
 
-
+@mock_s3
 @freeze_time("2021-01-02")
 def test_handler(mocker):
+    os.environ['S3_BUCKET'] = 'cubicl-bot'
+    os.environ['S3_PREFIX'] = 'runs'
     # given
+    s3 = boto3.client('s3', region_name='us-east-1')
+    s3.create_bucket(Bucket=os.environ['S3_BUCKET'])
+
     mock_get_all_users = mocker.patch(
         "slack_bot.app.get_users", return_value=copy.deepcopy(TEST_USERS)
     )
@@ -46,7 +47,7 @@ def test_handler(mocker):
     mock_send_message = mocker.patch("slack_bot.app.send_message")
 
     # when
-    local_dev_handler("", "")
+    handler("", "")
 
     # then
     mock_get_all_users.assert_called_once()
@@ -55,12 +56,12 @@ def test_handler(mocker):
 
     # when we try again only one more person should get a paired break
     with freeze_time("2021-01-03"):
-        local_dev_handler("", "")
+        handler("", "")
         assert mock_send_message.call_count == 5
 
     # when we try again
     with freeze_time("2021-01-04"):
-        local_dev_handler("", "")
+        handler("", "")
         # then the count should stay the same
         assert mock_send_message.call_count == 7
 
@@ -86,10 +87,10 @@ def test_send_message(mocker):
     assert mock_get_user_name.call_args_list[0].args[0] == "U1"
     assert mock_get_user_name.call_args_list[1].args[0] == "U2"
     assert (
-        mock_chat_postMessage.call_args_list[0][1]["text"]
-        == "Name1 and Name2, you were selected for a shared coffee break.\n"
-        "Please schedule a meeting of 15-20 minutes this week.\n\n"
-        "Your coffee bot ☕"
+            mock_chat_postMessage.call_args_list[0][1]["text"]
+            == "Name1 and Name2, you were selected for a shared coffee break.\n"
+               "Please schedule a meeting of 15-20 minutes this week.\n\n"
+               "Your coffee bot ☕"
     )
 
 
@@ -97,28 +98,28 @@ def test_send_message(mocker):
     "language,expected_message",
     [
         (
-            None,
-            "Name1 and Name2, you were selected for a shared coffee break.\n"
-            "Please schedule a meeting of 15-20 minutes this week.\n\n"
-            "Your coffee bot ☕",
+                None,
+                "Name1 and Name2, you were selected for a shared coffee break.\n"
+                "Please schedule a meeting of 15-20 minutes this week.\n\n"
+                "Your coffee bot ☕",
         ),
         (
-            "en",
-            "Name1 and Name2, you were selected for a shared coffee break.\n"
-            "Please schedule a meeting of 15-20 minutes this week.\n\n"
-            "Your coffee bot ☕",
+                "en",
+                "Name1 and Name2, you were selected for a shared coffee break.\n"
+                "Please schedule a meeting of 15-20 minutes this week.\n\n"
+                "Your coffee bot ☕",
         ),
         (
-            "not_defined_language",
-            "Name1 and Name2, you were selected for a shared coffee break.\n"
-            "Please schedule a meeting of 15-20 minutes this week.\n\n"
-            "Your coffee bot ☕",
+                "not_defined_language",
+                "Name1 and Name2, you were selected for a shared coffee break.\n"
+                "Please schedule a meeting of 15-20 minutes this week.\n\n"
+                "Your coffee bot ☕",
         ),
         (
-            "de",
-            "Name1 und Name2, ihr wurdet für einen gemeinsamen Kaffeeklatsch ausgelost.\n"
-            "Bitte sucht euch für diese Woche einen Zeitslot von 15-20 Minuten.\n\n"
-            "Euer Kaffeebot ☕",
+                "de",
+                "Name1 und Name2, ihr wurdet für einen gemeinsamen Kaffeeklatsch ausgelost.\n"
+                "Bitte sucht euch für diese Woche einen Zeitslot von 15-20 Minuten.\n\n"
+                "Euer Kaffeebot ☕",
         ),
     ],
 )
@@ -138,83 +139,83 @@ def test_get_message(mocker, language: str, expected_message: str):
     "user,user_info,expected_value",
     [
         (
-            "DELETED_USER_ID",
-            {
-                "user": {
-                    "deleted": True,
-                    "profile": {"status_emoji": "", "status_expiration": 0},
-                }
-            },
-            False,
+                "DELETED_USER_ID",
+                {
+                    "user": {
+                        "deleted": True,
+                        "profile": {"status_emoji": "", "status_expiration": 0},
+                    }
+                },
+                False,
         ),
         (
-            "HOLIDAY_USER_ID",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {"status_emoji": ":palm_tree:", "status_expiration": 0},
-                }
-            },
-            False,
+                "HOLIDAY_USER_ID",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {"status_emoji": ":palm_tree:", "status_expiration": 0},
+                    }
+                },
+                False,
         ),
         (
-            "HOLIDAY_EXPIRES_EARLY_USER_ID",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {
-                        "status_emoji": ":palm_tree:",
-                        "status_expiration": 1662793200,
-                    },
-                }
-            },
-            True,
+                "HOLIDAY_EXPIRES_EARLY_USER_ID",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {
+                            "status_emoji": ":palm_tree:",
+                            "status_expiration": 1662793200,
+                        },
+                    }
+                },
+                True,
         ),
         (
-            "HOLIDAY_EXPIRES_LATE_USER_ID",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {
-                        "status_emoji": ":palm_tree:",
-                        "status_expiration": 1662879600,
-                    },
-                }
-            },
-            False,
+                "HOLIDAY_EXPIRES_LATE_USER_ID",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {
+                            "status_emoji": ":palm_tree:",
+                            "status_expiration": 1662879600,
+                        },
+                    }
+                },
+                False,
         ),
         (
-            "ILL_USER_ID",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {
-                        "status_emoji": ":face_with_thermometer:",
-                        "status_expiration": 0,
-                    },
-                }
-            },
-            False,
+                "ILL_USER_ID",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {
+                            "status_emoji": ":face_with_thermometer:",
+                            "status_expiration": 0,
+                        },
+                    }
+                },
+                False,
         ),
         (
-            "STANDARD_USER_ID",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {"status_emoji": "", "status_expiration": 0},
-                }
-            },
-            True,
+                "STANDARD_USER_ID",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {"status_emoji": "", "status_expiration": 0},
+                    }
+                },
+                True,
         ),
         (
-            "STANDARD_USER_ID_WITH_EMOJI",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {"status_emoji": ":no_entry:", "status_expiration": 0},
-                }
-            },
-            True,
+                "STANDARD_USER_ID_WITH_EMOJI",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {"status_emoji": ":no_entry:", "status_expiration": 0},
+                    }
+                },
+                True,
         ),
     ],
 )
