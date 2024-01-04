@@ -2,10 +2,9 @@ import json
 import logging
 import os
 import random
+import math
 from abc import ABC, abstractmethod
-from datetime import (
-    datetime, timedelta
-)
+from datetime import datetime, timedelta
 from typing import List
 
 import boto3
@@ -28,23 +27,23 @@ class FileHandler(ABC):
 
 class S3FileHandler(FileHandler):
     def __init__(self, bucket: str, prefix: str):
-        self.s3 = boto3.client('s3')
+        self.s3 = boto3.client("s3")
         self.bucket = bucket
         self.prefix = prefix
 
     def _get_object_key(self):
-        current_date = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        return f'{self.prefix}/{current_date}.jsonl'
+        current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        return f"{self.prefix}/{current_date}.jsonl"
 
     def read(self) -> List[dict]:
         try:
-            object_list = self.s3.list_objects_v2(Bucket=self.bucket, Prefix='runs/')
-            file_keys = [obj['Key'] for obj in object_list.get('Contents', [])]
+            object_list = self.s3.list_objects_v2(Bucket=self.bucket, Prefix=self.prefix)
+            file_keys = [obj["Key"] for obj in object_list.get("Contents", [])]
 
             all_data = []
             for file_key in sorted(file_keys):
                 response = self.s3.get_object(Bucket=self.bucket, Key=file_key)
-                data = response['Body'].read().decode('utf-8')
+                data = response["Body"].read().decode("utf-8")
                 data_list = json.loads(data)
                 all_data.extend(data_list)
 
@@ -65,7 +64,7 @@ class S3FileHandler(FileHandler):
 
 
 def handler(__event, __context) -> None:
-    file_handler = S3FileHandler(os.environ['S3_BUCKET'], os.environ['S3_PREFIX'])
+    file_handler = S3FileHandler(os.environ["S3_BUCKET"], os.environ["S3_PREFIX"])
     process_users(file_handler)
 
 
@@ -79,17 +78,13 @@ def process_users(file_handler: FileHandler) -> None:
     # Filter users based on previous runs
     users = filter_users_based_on_previous_runs(users, previous_runs)
 
-    # create pairs from entries
-    logger.info("Picking from user list: %s", users)
-
     user_pairs = list(zip(users[::2], users[1::2]))
-    logger.info("Picked pairs: %s", user_pairs)
 
     for user_pair in user_pairs:
-        send_message(user_pair, client)
+        send_message(list(user_pair), client)
 
     # Update runs file
-    file_handler.write([{"date": datetime.now().isoformat(), "pair": pair} for pair in user_pairs])
+    file_handler.write([{"date": datetime.now().date().isoformat(), "pair": pair} for pair in user_pairs])
 
 
 def send_message(users: list[str], client: WebClient) -> None:
@@ -153,39 +148,38 @@ def get_user_name(user_id: str, client: WebClient) -> str:
     return user_name.split()[0]
 
 
-def filter_users_based_on_previous_runs(users, previous_runs):
+def filter_users_based_on_previous_runs(users, previous_runs) -> list[str]:
     if len(users) < 2:
         return []
 
-    thirty_days_ago = datetime.now() - timedelta(days=30)
-
     # Find the last run date of each user
-    last_run_dates = {}
-    for run in previous_runs:
-        for user in run['pair']:
-            if user not in last_run_dates or datetime.fromisoformat(
-                    run['date']) > datetime.fromisoformat(last_run_dates[user]):
-                last_run_dates[user] = run['date']
+    last_run_dates = {user: max(run["date"] for run in previous_runs if user in run["pair"]) for user in users if
+                      any(user in run["pair"] for run in previous_runs)}
 
-    # Users who need a break due to the 30-day rule
-    need_break_users = {user for user in users if user not in last_run_dates or datetime.fromisoformat(
-        last_run_dates[user]) < thirty_days_ago}
+    # Users who need a coffee break as they had none in the last 30 days
+    need_break_users = [user for user in users if user not in last_run_dates]
+    random.shuffle(need_break_users)
+    other_users = [user for user in users if user not in need_break_users]
 
     # Users from the latest run date (those who took a break in the last round)
-    latest_run_date = max(run['date'] for run in previous_runs) if previous_runs else "1970-01-01"
-    last_round_users = {user for run in previous_runs if run['date'] == latest_run_date for user in run['pair']}
+    latest_run_date = max(run["date"] for run in previous_runs) if previous_runs else "1970-01-01"
+    last_run_pairs = [tuple(sorted(pair)) for pair in
+                      [run['pair'] for run in previous_runs if run['date'] == latest_run_date]]
 
     # If we haven't met the 50% rule, add random users to fill incomplete user pairs
-    available_users = list(set(users) - need_break_users - last_round_users)
-    required_users_count = len(users) // 2 - len(need_break_users)
+    number_of_coffee_break_users = math.ceil(len(users) / 4) * 2
+    required_users_count = number_of_coffee_break_users - len(need_break_users)
 
-    if required_users_count <= 0:
-        return list(need_break_users)
+    coffee_break_users = need_break_users
+    if required_users_count < 0:
+        del coffee_break_users[required_users_count:]
+    elif required_users_count > 0:
+        coffee_break_users.extend(random.sample(other_users, required_users_count))
 
-    if len(available_users) < 1:
-        return list(need_break_users) + random.sample(users, 1)
+    # Keep shuffling until a suitable arrangement (no combination from last run) is found
+    random.shuffle(coffee_break_users)
+    while any(tuple(sorted(pair)) in last_run_pairs for pair in zip(users, users[1:])):
+        random.shuffle(coffee_break_users)
+        print(users)
 
-    need_break_users.update(random.sample(available_users, required_users_count) if len(
-        available_users) > required_users_count else available_users)
-
-    return list(need_break_users)
+    return coffee_break_users

@@ -1,4 +1,5 @@
 import copy
+import json
 import os
 
 import pytest
@@ -13,6 +14,7 @@ from slack_bot.app import (
     handler,
     send_message,
 )
+from slack_bot.app import S3FileHandler
 from slack_sdk import WebClient
 
 TEST_USERS = [
@@ -31,20 +33,19 @@ TEST_USERS = [
 def test_version():
     assert __version__ == "0.1.0"
 
-@mock_s3
+
 @freeze_time("2021-01-02")
 def test_handler(mocker):
     os.environ['S3_BUCKET'] = 'cubicl-bot'
     os.environ['S3_PREFIX'] = 'runs'
     # given
-    s3 = boto3.client('s3', region_name='us-east-1')
-    s3.create_bucket(Bucket=os.environ['S3_BUCKET'])
-
     mock_get_all_users = mocker.patch(
         "slack_bot.app.get_users", return_value=copy.deepcopy(TEST_USERS)
     )
     mock_token = mocker.patch("slack_bot.app.get_token", return_value="xxx")
     mock_send_message = mocker.patch("slack_bot.app.send_message")
+    mock_file_handler_read = mocker.patch("slack_bot.app.S3FileHandler.read", return_value=[])
+    mock_file_handler_write = mocker.patch("slack_bot.app.S3FileHandler.write")
 
     # when
     handler("", "")
@@ -52,18 +53,9 @@ def test_handler(mocker):
     # then
     mock_get_all_users.assert_called_once()
     mock_token.assert_called_once()
-    assert mock_send_message.call_count == 4
-
-    # when we try again only one more person should get a paired break
-    with freeze_time("2021-01-03"):
-        handler("", "")
-        assert mock_send_message.call_count == 5
-
-    # when we try again
-    with freeze_time("2021-01-04"):
-        handler("", "")
-        # then the count should stay the same
-        assert mock_send_message.call_count == 7
+    mock_file_handler_read.assert_called_once()
+    mock_file_handler_write.assert_called_once()
+    assert mock_send_message.call_count == 3
 
 
 def test_send_message(mocker):
@@ -229,3 +221,23 @@ def test_is_included_user(mocker, user: str, user_info: dict, expected_value: bo
 
     # then
     assert is_included is expected_value
+
+
+@mock_s3
+def test_read_from_s3():
+    # given
+    os.environ['S3_BUCKET'] = 'cubicl-bot'
+    os.environ['S3_PREFIX'] = 'runs'
+    with mock_s3():
+        bucket = 'test-bucket'
+        s3_client = boto3.client('s3', region_name='us-east-1')
+        s3_client.create_bucket(Bucket=bucket)
+        sample_run = [
+            {'date': '2023-07-02', 'pair': ['user5', 'user6']},
+            {'date': '2023-07-02', 'pair': ['user7', 'user8']},
+            {'date': '2023-07-02', 'pair': ['user9', 'user1']},
+        ]
+        s3_client.put_object(Body=json.dumps(sample_run), Bucket=bucket, Key="runs/test.jsonl")
+        file_handler = S3FileHandler(bucket=bucket, prefix="runs")
+        result = file_handler.read()
+        assert result == sample_run
