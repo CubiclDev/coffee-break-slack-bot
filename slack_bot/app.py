@@ -178,7 +178,7 @@ def filter_users_based_on_previous_runs(users, previous_runs) -> list[str]:
 
     # Keep shuffling until a suitable arrangement (no combination from last run) is found
     random.shuffle(coffee_break_users)
-    while any(tuple(sorted(pair)) in last_run_pairs for pair in zip(users, users[1:])):
+    while any(tuple(sorted(pair)) in last_run_pairs for pair in zip(coffee_break_users, users[1:])):
         random.shuffle(coffee_break_users)
         print(users)
 
