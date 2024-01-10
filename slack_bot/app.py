@@ -33,7 +33,7 @@ class S3FileHandler(FileHandler):
 
     def _get_object_key(self):
         current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        return f"{self.prefix}/{current_date}.jsonl"
+        return f"{self.prefix}/{current_date}.json"
 
     def read(self) -> List[dict]:
         try:
