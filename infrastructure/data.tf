@@ -31,8 +31,8 @@ data "aws_iam_policy_document" "s3" {
     ]
 
     resources = [
-      aws_s3_bucket.lambda_bucket.arn,
-      "${aws_s3_bucket.lambda_bucket.arn}/*"
+      "${aws_s3_bucket.lambda_bucket.arn}/user_history",
+      "${aws_s3_bucket.lambda_bucket.arn}/user_history/*"
     ]
   }
 }
