@@ -9,7 +9,7 @@ terraform {
 }
 
 provider "aws" {
-  region  = "eu-central-1"
+  region = "eu-central-1"
 }
 
 resource "aws_s3_bucket" "lambda_bucket" {
@@ -19,6 +19,23 @@ resource "aws_s3_bucket" "lambda_bucket" {
 resource "aws_s3_bucket_acl" "lambda_bucket_acl" {
   bucket = aws_s3_bucket.lambda_bucket.id
   acl    = "private"
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "this" {
+  bucket = aws_s3_bucket.lambda_bucket.id
+
+  rule {
+    id = "keep_user_history_for_30_days"
+
+    filter {
+      prefix = "user_history/"
+    }
+    status = "Enabled"
+
+    expiration {
+      days = 30
+    }
+  }
 }
 
 resource "aws_s3_object" "lambda_slack_bot" {
@@ -46,9 +63,11 @@ resource "aws_lambda_function" "slack_bot" {
 
   environment {
     variables = {
-      LANGUAGE = var.language
+      LANGUAGE    = var.language
       SLACK_TOKEN = data.aws_secretsmanager_secret_version.slack_token.secret_string
-      USERS = data.aws_secretsmanager_secret_version.users.secret_string
+      USERS       = data.aws_secretsmanager_secret_version.users.secret_string
+      S3_BUCKET   = aws_s3_bucket.lambda_bucket.bucket
+      S3_PREFIX   = "user_history"
     }
   }
 }
@@ -125,6 +144,16 @@ EOF
 resource "aws_iam_role_policy_attachment" "ssm_policy" {
   role       = aws_iam_role.lambda_exec.name
   policy_arn = aws_iam_policy.ssm_policy.arn
+}
+
+resource "aws_iam_policy" "s3_policy" {
+  name   = "S3ReadWriteAccess"
+  policy = data.aws_iam_policy_document.s3.json
+}
+
+resource "aws_iam_role_policy_attachment" "s3_policy" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = aws_iam_policy.s3_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_policy" {

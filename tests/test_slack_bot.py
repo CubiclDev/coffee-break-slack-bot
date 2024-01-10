@@ -1,17 +1,20 @@
 import copy
+import json
 import os
 
 import pytest
 from freezegun import freeze_time
+from moto import mock_s3
+import boto3
+
 from slack_bot import __version__
 from slack_bot.app import (
-    get_chosen_users,
     get_message,
-    handler,
     is_included_user,
-    remove_chosen_users,
+    handler,
     send_message,
 )
+from slack_bot.app import S3FileHandler
 from slack_sdk import WebClient
 
 TEST_USERS = [
@@ -31,23 +34,18 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-def test_get_users():
-    # when
-    user_ids = get_chosen_users(TEST_USERS)
-
-    # then
-    assert len(user_ids) == 2
-    assert user_ids[0] != user_ids[1]
-
-
 @freeze_time("2021-01-02")
 def test_handler(mocker):
+    os.environ['S3_BUCKET'] = 'cubicl-bot'
+    os.environ['S3_PREFIX'] = 'runs'
     # given
     mock_get_all_users = mocker.patch(
         "slack_bot.app.get_users", return_value=copy.deepcopy(TEST_USERS)
     )
     mock_token = mocker.patch("slack_bot.app.get_token", return_value="xxx")
     mock_send_message = mocker.patch("slack_bot.app.send_message")
+    mock_file_handler_read = mocker.patch("slack_bot.app.S3FileHandler.read", return_value=[])
+    mock_file_handler_write = mocker.patch("slack_bot.app.S3FileHandler.write")
 
     # when
     handler("", "")
@@ -55,6 +53,8 @@ def test_handler(mocker):
     # then
     mock_get_all_users.assert_called_once()
     mock_token.assert_called_once()
+    mock_file_handler_read.assert_called_once()
+    mock_file_handler_write.assert_called_once()
     assert mock_send_message.call_count == 3
 
 
@@ -79,10 +79,10 @@ def test_send_message(mocker):
     assert mock_get_user_name.call_args_list[0].args[0] == "U1"
     assert mock_get_user_name.call_args_list[1].args[0] == "U2"
     assert (
-        mock_chat_postMessage.call_args_list[0][1]["text"]
-        == "Name1 and Name2, you were selected for a shared coffee break.\n"
-        "Please schedule a meeting of 15-20 minutes this week.\n\n"
-        "Your coffee bot ☕"
+            mock_chat_postMessage.call_args_list[0][1]["text"]
+            == "Name1 and Name2, you were selected for a shared coffee break.\n"
+               "Please schedule a meeting of 15-20 minutes this week.\n\n"
+               "Your coffee bot ☕"
     )
 
 
@@ -90,28 +90,28 @@ def test_send_message(mocker):
     "language,expected_message",
     [
         (
-            None,
-            "Name1 and Name2, you were selected for a shared coffee break.\n"
-            "Please schedule a meeting of 15-20 minutes this week.\n\n"
-            "Your coffee bot ☕",
+                None,
+                "Name1 and Name2, you were selected for a shared coffee break.\n"
+                "Please schedule a meeting of 15-20 minutes this week.\n\n"
+                "Your coffee bot ☕",
         ),
         (
-            "en",
-            "Name1 and Name2, you were selected for a shared coffee break.\n"
-            "Please schedule a meeting of 15-20 minutes this week.\n\n"
-            "Your coffee bot ☕",
+                "en",
+                "Name1 and Name2, you were selected for a shared coffee break.\n"
+                "Please schedule a meeting of 15-20 minutes this week.\n\n"
+                "Your coffee bot ☕",
         ),
         (
-            "not_defined_language",
-            "Name1 and Name2, you were selected for a shared coffee break.\n"
-            "Please schedule a meeting of 15-20 minutes this week.\n\n"
-            "Your coffee bot ☕",
+                "not_defined_language",
+                "Name1 and Name2, you were selected for a shared coffee break.\n"
+                "Please schedule a meeting of 15-20 minutes this week.\n\n"
+                "Your coffee bot ☕",
         ),
         (
-            "de",
-            "Name1 und Name2, ihr wurdet für einen gemeinsamen Kaffeeklatsch ausgelost.\n"
-            "Bitte sucht euch für diese Woche einen Zeitslot von 15-20 Minuten.\n\n"
-            "Euer Kaffeebot ☕",
+                "de",
+                "Name1 und Name2, ihr wurdet für einen gemeinsamen Kaffeeklatsch ausgelost.\n"
+                "Bitte sucht euch für diese Woche einen Zeitslot von 15-20 Minuten.\n\n"
+                "Euer Kaffeebot ☕",
         ),
     ],
 )
@@ -131,83 +131,83 @@ def test_get_message(mocker, language: str, expected_message: str):
     "user,user_info,expected_value",
     [
         (
-            "DELETED_USER_ID",
-            {
-                "user": {
-                    "deleted": True,
-                    "profile": {"status_emoji": "", "status_expiration": 0},
-                }
-            },
-            False,
+                "DELETED_USER_ID",
+                {
+                    "user": {
+                        "deleted": True,
+                        "profile": {"status_emoji": "", "status_expiration": 0},
+                    }
+                },
+                False,
         ),
         (
-            "HOLIDAY_USER_ID",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {"status_emoji": ":palm_tree:", "status_expiration": 0},
-                }
-            },
-            False,
+                "HOLIDAY_USER_ID",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {"status_emoji": ":palm_tree:", "status_expiration": 0},
+                    }
+                },
+                False,
         ),
         (
-            "HOLIDAY_EXPIRES_EARLY_USER_ID",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {
-                        "status_emoji": ":palm_tree:",
-                        "status_expiration": 1662793200,
-                    },
-                }
-            },
-            True,
+                "HOLIDAY_EXPIRES_EARLY_USER_ID",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {
+                            "status_emoji": ":palm_tree:",
+                            "status_expiration": 1662793200,
+                        },
+                    }
+                },
+                True,
         ),
         (
-            "HOLIDAY_EXPIRES_LATE_USER_ID",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {
-                        "status_emoji": ":palm_tree:",
-                        "status_expiration": 1662879600,
-                    },
-                }
-            },
-            False,
+                "HOLIDAY_EXPIRES_LATE_USER_ID",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {
+                            "status_emoji": ":palm_tree:",
+                            "status_expiration": 1662879600,
+                        },
+                    }
+                },
+                False,
         ),
         (
-            "ILL_USER_ID",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {
-                        "status_emoji": ":face_with_thermometer:",
-                        "status_expiration": 0,
-                    },
-                }
-            },
-            False,
+                "ILL_USER_ID",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {
+                            "status_emoji": ":face_with_thermometer:",
+                            "status_expiration": 0,
+                        },
+                    }
+                },
+                False,
         ),
         (
-            "STANDARD_USER_ID",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {"status_emoji": "", "status_expiration": 0},
-                }
-            },
-            True,
+                "STANDARD_USER_ID",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {"status_emoji": "", "status_expiration": 0},
+                    }
+                },
+                True,
         ),
         (
-            "STANDARD_USER_ID_WITH_EMOJI",
-            {
-                "user": {
-                    "deleted": False,
-                    "profile": {"status_emoji": ":no_entry:", "status_expiration": 0},
-                }
-            },
-            True,
+                "STANDARD_USER_ID_WITH_EMOJI",
+                {
+                    "user": {
+                        "deleted": False,
+                        "profile": {"status_emoji": ":no_entry:", "status_expiration": 0},
+                    }
+                },
+                True,
         ),
     ],
 )
@@ -223,22 +223,21 @@ def test_is_included_user(mocker, user: str, user_info: dict, expected_value: bo
     assert is_included is expected_value
 
 
-def test_remove_users():
+@mock_s3
+def test_read_from_s3():
     # given
-    user_list = copy.deepcopy(TEST_USERS)
-    users_length = len(user_list)
-
-    # when
-    remove_chosen_users(["U1", "U2"], user_list)
-
-    # then
-    assert len(user_list) == users_length - 2
-    assert user_list == [
-        "U3",
-        "U4",
-        "U5",
-        "U6",
-        "U7",
-        "U8",
-        "U9",
-    ]
+    os.environ['S3_BUCKET'] = 'cubicl-bot'
+    os.environ['S3_PREFIX'] = 'runs'
+    with mock_s3():
+        bucket = 'test-bucket'
+        s3_client = boto3.client('s3', region_name='us-east-1')
+        s3_client.create_bucket(Bucket=bucket)
+        sample_run = [
+            {'date': '2023-07-02', 'pair': ['user5', 'user6']},
+            {'date': '2023-07-02', 'pair': ['user7', 'user8']},
+            {'date': '2023-07-02', 'pair': ['user9', 'user1']},
+        ]
+        s3_client.put_object(Body=json.dumps(sample_run), Bucket=bucket, Key="runs/test.jsonl")
+        file_handler = S3FileHandler(bucket=bucket, prefix="runs")
+        result = file_handler.read()
+        assert result == sample_run

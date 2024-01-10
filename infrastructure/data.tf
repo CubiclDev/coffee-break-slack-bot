@@ -1,6 +1,6 @@
 data "archive_file" "this" {
   output_path = "${path.module}/../slack_bot.zip"
-  source_dir = "${path.module}/../slack_bot_with_dependencies"
+  source_dir  = "${path.module}/../slack_bot_with_dependencies"
   type        = "zip"
 }
 
@@ -18,4 +18,21 @@ data "aws_secretsmanager_secret" "users" {
 
 data "aws_secretsmanager_secret_version" "users" {
   secret_id = data.aws_secretsmanager_secret.users.id
+}
+
+data "aws_iam_policy_document" "s3" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "s3:ListBucket",
+      "s3:GetObject*",
+      "s3:PutObject*",
+    ]
+
+    resources = [
+      "${aws_s3_bucket.lambda_bucket.arn}/user_history",
+      "${aws_s3_bucket.lambda_bucket.arn}/user_history/*"
+    ]
+  }
 }
