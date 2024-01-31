@@ -2,4 +2,4 @@
 pytest
 pytest-mock
 freezegun
-moto
+moto==4.2.13
