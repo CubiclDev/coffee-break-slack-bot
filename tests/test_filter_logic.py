@@ -83,7 +83,7 @@ def test_generate_user_pairs(users, expected_user_pairs):
 @pytest.mark.parametrize(
     "users,previous_runs,expected_raises,expected_filtered_users",
     [
-        # Simplest cases, no previous runs and number of uses is a multiple of
+        # Simplest cases, no previous runs and number of users is a multiple of
         # 2, the filtered users should be 50% of the total users
         [
             ["a", "b"],
