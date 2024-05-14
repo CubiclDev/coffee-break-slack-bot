@@ -68,6 +68,11 @@ def handler(__event, __context) -> None:
     process_users(file_handler)
 
 
+def generate_user_pairs(users: list[str]) -> list[tuple[str]]:
+    user_pairs = list(zip(users[::2], users[1::2]))
+    return [tuple(sorted(pair)) for pair in user_pairs]
+
+
 def process_users(file_handler: FileHandler) -> None:
     client = WebClient(token=get_token())
     users = get_users(client)
@@ -76,9 +81,9 @@ def process_users(file_handler: FileHandler) -> None:
     previous_runs = file_handler.read()
 
     # Filter users based on previous runs
-    users = filter_users_based_on_previous_runs(users, previous_runs)
+    filtered_users = filter_users_based_on_previous_runs(users, previous_runs)
 
-    user_pairs = list(zip(users[::2], users[1::2]))
+    user_pairs = generate_user_pairs(filtered_users)
 
     for user_pair in user_pairs:
         send_message(list(user_pair), client)
@@ -178,8 +183,15 @@ def filter_users_based_on_previous_runs(users, previous_runs) -> list[str]:
 
     # Keep shuffling until a suitable arrangement (no combination from last run) is found
     random.shuffle(coffee_break_users)
-    while any(tuple(sorted(pair)) in last_run_pairs for pair in zip(coffee_break_users, users[1:])):
+    user_pairs = generate_user_pairs(coffee_break_users)
+    num_tries = 0
+    max_tries = 1000
+    while any(pair in last_run_pairs for pair in user_pairs):
         random.shuffle(coffee_break_users)
-        print(users)
+        user_pairs = generate_user_pairs(coffee_break_users)
+        num_tries += 1
+        print(coffee_break_users)
+        if num_tries > max_tries:
+            raise ValueError("Given users and previous runs do not produce valid pairs.")
 
     return coffee_break_users
