@@ -123,7 +123,7 @@ def get_token() -> str:
 
 
 def get_users(client: WebClient) -> list:
-    users = json.loads(os.environ.get("USERS"))
+    users = list(json.loads(os.environ.get("USERS")).values())
     return filter_users(users, client)
 
 
