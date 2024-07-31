@@ -6,6 +6,7 @@ As a result, the exchange in the team is increased.
 Users that are absent are automatically excluded. Absence is determined by checking if one of the following status emojis is set:
 - 🌴
 - 🤒
+- 👶
 
 ## Requirements
 - [Python 3.9](https://www.python.org/)

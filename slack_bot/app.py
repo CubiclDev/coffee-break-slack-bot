@@ -12,7 +12,7 @@ from slack_sdk import WebClient
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-ABSENCE_EMOJIS = [":palm_tree:", ":face_with_thermometer:"]
+ABSENCE_EMOJIS = [":palm_tree:", ":face_with_thermometer:", ":baby:"]
 
 
 class FileHandler(ABC):
