@@ -6,6 +6,7 @@ As a result, the exchange in the team is increased.
 Users that are absent are automatically excluded. Absence is determined by checking if one of the following status emojis is set:
 - 🌴
 - 🤒
+- 👶
 
 ## Requirements
 - [Python 3.9](https://www.python.org/)
@@ -32,7 +33,7 @@ You can find the token in the `OAuth & Permissions` section of your app.
 You also need to configure the user list in the SecretsManager. 
 Create a secret named `coffee-break-slack-bot/users` to store the user list.
 You can find the id of a slack member in the profile information. Press `More` and copy the member id.
-The format of the list has to be `["U1", "U2", ...]`.
+The format of the list has to be `{username1: id_1, username2: id_2, ...}`.
 
 ### Terraform Variables
 If you would like to override default values of variables, copy the `terraform.tfvars.dist` file to `terraform.tfvars` and fill in values for the predefined variable names.

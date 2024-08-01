@@ -12,7 +12,7 @@ from slack_sdk import WebClient
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-ABSENCE_EMOJIS = [":palm_tree:", ":face_with_thermometer:"]
+ABSENCE_EMOJIS = [":palm_tree:", ":face_with_thermometer:", ":baby:"]
 
 
 class FileHandler(ABC):
@@ -123,7 +123,7 @@ def get_token() -> str:
 
 
 def get_users(client: WebClient) -> list:
-    users = json.loads(os.environ.get("USERS"))
+    users = list(json.loads(os.environ.get("USERS")).values())
     return filter_users(users, client)
 
 
